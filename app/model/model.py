@@ -23,17 +23,11 @@ with open(f"{BASE_DIR}/lr_model.pkl", "rb") as f:
 @lru_cache(maxsize=2048)
 def predict(text):
     integers = (int(float(v)) for v in text.split("-"))
-    return model.predict([list(integers)])[0]
+    return model_lg.predict([list(integers)])[0]
     #return model.predict([list(map(int, map(float, text.split("-"))))])[0]
     #return model.predict([[int(float(v)) for v in text.split("-")]])[0]
 
-async def predict_pipeline(text):
-    #start_time = time.time()
-    #n_text = "".join(str(val) for val in text)
-    #result = r.get(n_text)
-    #if result is not None:
-    #    return result.decode()
-    
+async def predict_pipeline_lg(text):
     with ThreadPoolExecutor() as pool:
         loop = asyncio.get_event_loop()
         pred_coro = loop.run_in_executor(pool, predict, text)
