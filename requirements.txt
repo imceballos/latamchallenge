@@ -1,2 +1,3 @@
 scikit-learn
-redis==3.5.3
+xgboost
+aiofiles

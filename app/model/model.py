@@ -1,44 +1,66 @@
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path 
-import redis
 import asyncio
 import pickle
-import re
-import time
 from functools import lru_cache
-
-#r = redis.Redis(
-#  host='redis-14663.c1.us-central1-2.gce.cloud.redislabs.com',
-#  port=14663,
-#  password='Hi1ZjwRp0WmrUhGK3HqpdCnIunrHHiEy')
+import xgboost
+import aiofiles
 
 __version__ = "0.1.0"
 
 BASE_DIR = Path(__file__).resolve(strict=True).parent
 
-with open(f"{BASE_DIR}/lr_model.pkl", "rb") as f:
-    model_lg = pickle.load(f)
+async def load_lg_model():
+    async with aiofiles.open(f"{BASE_DIR}/lr_model.pkl", mode='rb') as f:
+        model_lg = pickle.loads(await f.read())
+    return model_lg
 
+async def load_xgb_model():
+    async with aiofiles.open(f"{BASE_DIR}/xgb_model.pkl", mode='rb') as f:
+        model_xgb = pickle.loads(await f.read())
+    return model_xgb
 
-@lru_cache(maxsize=2048)
-def predict(text):
+async def load_xgbopt_model():
+    async with aiofiles.open(f"{BASE_DIR}/xgb_model_opt.pkl", mode='rb') as f:
+        model_xgb_opt = pickle.loads(await f.read())
+    return model_xgb_opt
+
+model_lg = asyncio.run(load_lg_model())
+model_xgb = asyncio.run(load_xgb_model())
+model_xgb_opt = asyncio.run(load_xgbopt_model())
+
+@lru_cache(maxsize=512)
+def predict_lg(text):
     integers = (int(float(v)) for v in text.split("-"))
-    return model.predict([list(integers)])[0]
-    #return model.predict([list(map(int, map(float, text.split("-"))))])[0]
-    #return model.predict([[int(float(v)) for v in text.split("-")]])[0]
+    return model_lg.predict([list(integers)])[0]
 
-async def predict_pipeline(text):
-    #start_time = time.time()
-    #n_text = "".join(str(val) for val in text)
-    #result = r.get(n_text)
-    #if result is not None:
-    #    return result.decode()
-    
+@lru_cache(maxsize=512)
+def predict_xgb(text):
+    integers = (int(float(v)) for v in text.split("-"))
+    return model_xgb.predict([list(integers)])[0]
+
+@lru_cache(maxsize=512)
+def predict_xgb_opt(text):
+    integers = (int(float(v)) for v in text.split("-"))
+    return model_xgb_opt.predict([list(integers)])[0]
+
+async def predict_pipeline_lg(text):
     with ThreadPoolExecutor() as pool:
         loop = asyncio.get_event_loop()
-        pred_coro = loop.run_in_executor(pool, predict, text)
+        pred_coro = loop.run_in_executor(pool, predict_lg, text)
         pred = await pred_coro
-        #r.set(n_text, str(pred[0]))
-    #pred = await predict(text)
-    #print("--- %s seconds ---" % (time.time() - start_time))
+    return pred
+
+async def predict_pipeline_xgb(text):
+    with ThreadPoolExecutor() as pool:
+        loop = asyncio.get_event_loop()
+        pred_coro = loop.run_in_executor(pool, predict_xgb, text)
+        pred = await pred_coro
+    return pred
+
+async def predict_pipeline_xgb_opt(text):
+    with ThreadPoolExecutor() as pool:
+        loop = asyncio.get_event_loop()
+        pred_coro = loop.run_in_executor(pool, predict_xgb_opt, text)
+        pred = await pred_coro
     return pred
