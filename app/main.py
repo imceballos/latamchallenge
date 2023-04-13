@@ -2,7 +2,7 @@ import asyncio
 from fastapi import FastAPI
 from pydantic import BaseModel, validator
 from typing import List
-from .model.model import predict_pipeline_lg
+from .model.model import predict_pipeline_lg, predict_pipeline_xgb, predict_pipeline_xgb_opt
 
 app = FastAPI()
 
@@ -17,6 +17,20 @@ class TextIn(BaseModel):
 
     def to_string(self):
         return "-".join(list((str(v) for v in self.data)))
+
+
+class TextOptIn(BaseModel):
+    data: List[float]
+
+    @validator('data')
+    def check_data_length(cls, v):
+        if len(v) != 11:
+            raise ValueError('Data must have 11 elements')
+        return v
+
+    def to_string(self):
+        return "-".join(list((str(v) for v in self.data)))
+
 
 class PredictionOut(BaseModel):
     predicted: int
@@ -35,6 +49,12 @@ async def predict_lg(payload: TextIn):
 async def predict_xgb(payload: TextIn):
     numpy_data = payload.to_string()
     predicted = await predict_pipeline_xgb(numpy_data)
+    return {"predicted": predicted}
+
+@app.post("/predict_xgb_opt", response_model=PredictionOut, tags=["predictions"])
+async def predict_xgb_opt(payload: TextOptIn):
+    numpy_data = payload.to_string()
+    predicted = await predict_pipeline_xgb_opt(numpy_data)
     return {"predicted": predicted}
 
 if __name__ == '__main__':
